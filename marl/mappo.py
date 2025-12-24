@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-
+import os
 
 class MAPPO:
     def __init__(
@@ -137,4 +137,19 @@ class MAPPO:
         self.last_actor_loss = actor_loss.item()
         self.last_critic_loss = critic_loss.item()
         self.last_entropy = entropy.item()
+    
+
+    def save(self, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        torch.save({
+            "actor": self.actor.state_dict(),
+            "critic": self.critic.state_dict(),
+            "gnn": self.gnn.state_dict()
+        }, path)
+
+    def load(self, path):
+        checkpoint = torch.load(path, map_location="cpu")
+        self.actor.load_state_dict(checkpoint["actor"])
+        self.critic.load_state_dict(checkpoint["critic"])
+        self.gnn.load_state_dict(checkpoint["gnn"])
 

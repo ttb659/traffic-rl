@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 
+
 from env.multi_agent_traffic_env import MultiAgentTrafficEnv
 from gnn.light_gnn import LightGNN
 from marl.actor import Actor
@@ -21,7 +22,7 @@ EMB_DIM = 32
 N_AGENTS = 9
 ACTION_DIM = 2
 
-EPISODES =50      # commence petit
+EPISODES =500      # commence petit
 EP_LEN = 200
 
 # =====================
@@ -44,7 +45,8 @@ A_norm = torch.tensor(
 # =====================
 # MODELS
 # =====================
-USE_GNN = False  # <-- ABLATION ICI POUR TESTER SANS GNN
+USE_GNN = True # <-- ABLATION ICI POUR TESTER AVEC GNN
+#USE_GNN = False  # <-- ABLATION ICI POUR TESTER SANS GNN
 
 if USE_GNN:
     logger = Logger()
@@ -130,6 +132,10 @@ for episode in range(EPISODES):
         avg_queue
     ])
 
+    # Sauvegarde périodique (toutes les 50 épisodes)
+    if episode % 50 == 0 and episode > 0:
+        mappo.save(f"models_save/checkpoints_MAPPO+Light_GNN/mappo_ep{episode}.pt")
+
 
     if episode % 5 == 0:
         print(
@@ -140,5 +146,9 @@ for episode in range(EPISODES):
             f"Entropy: {mappo.last_entropy:5.3f} | "
             f"AvgQueue: {avg_queue:6.1f}"
         )
+
+mappo.save("models_save/mappo_final+Light_Gnn.pt")
+print("✅ Final model saved.")
+
 
 env.close()
