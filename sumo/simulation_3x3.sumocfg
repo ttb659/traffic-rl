@@ -1,6 +1,6 @@
 <configuration>
     <input>
-        <net-file value="network_3x3.net.xml"/>
+        <net-file value="network_3x3_fixed.net.xml"/>
         <route-files value="routes_3x3.rou.xml"/>
     </input>
     <time>

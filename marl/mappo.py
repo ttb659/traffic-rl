@@ -3,13 +3,29 @@ import torch.nn.functional as F
 
 
 class MAPPO:
-    def __init__(self, actor, critic, gnn, lr=3e-4, gamma=0.99, clip=0.2):
+    def __init__(
+        self,
+        actor,
+        critic,
+        gnn,
+        lr=3e-4,
+        gamma=0.99,
+        clip=0.2,
+        gae_lambda=0.95,
+        ppo_epochs=4,
+        entropy_coef=0.01,
+        value_coef=0.5
+    ):
         self.actor = actor
         self.critic = critic
         self.gnn = gnn
 
         self.gamma = gamma
         self.clip = clip
+        self.gae_lambda = gae_lambda
+        self.ppo_epochs = ppo_epochs
+        self.entropy_coef = entropy_coef
+        self.value_coef = value_coef
 
         self.optimizer = torch.optim.Adam(
             list(actor.parameters()) +
@@ -18,105 +34,107 @@ class MAPPO:
             lr=lr
         )
 
-    """def compute_returns(self, rewards):
-        R = 0
-        returns = []
-        for r in reversed(rewards):
-            R = r + self.gamma * R
-            returns.insert(0, R)
-        return torch.tensor(returns, dtype=torch.float32)"""
-
-    def compute_gae(self, rewards, values, gamma=0.99, lam=0.95):
-        advantages = []
+    # ======================================================
+    # GAE (CORRECT)
+    # ======================================================
+    def compute_gae(self, rewards, values, dones):
+        """
+        rewards : (T,)
+        values  : (T+1,)
+        dones   : (T,)
+        """
+        advantages = torch.zeros(len(rewards))
         gae = 0.0
-        values = values + [0.0]  # bootstrap final V(T+1) = 0
 
         for t in reversed(range(len(rewards))):
-            delta = rewards[t] + gamma * values[t + 1] - values[t]
-            gae = delta + gamma * lam * gae
-            advantages.insert(0, gae)
+            delta = rewards[t] + self.gamma * values[t + 1] * (1 - dones[t]) - values[t]
+            gae = delta + self.gamma * self.gae_lambda * (1 - dones[t]) * gae
+            advantages[t] = gae
 
-        return torch.tensor(advantages, dtype=torch.float32)
+        returns = advantages + values[:-1]
+        return advantages, returns
 
-
+    # ======================================================
+    # UPDATE MAPPO (CORRIGÉ)
+    # ======================================================
     def update(self, batch):
-        """
-        batch contient :
-        - states: (T, N, obs_dim)
-        - actions: (T, N)
-        - log_probs: (T, N)
-        - rewards: (T,)
-        """
-
-        states = batch["states"]
-        actions = batch["actions"]
-        old_log_probs = batch["log_probs"]
-        rewards = batch["rewards"]
+        states = batch["states"]       # (T, N, obs_dim)
+        actions = batch["actions"]     # (T, N)
+        old_log_probs = batch["log_probs"]  # (T, N)
+        rewards = torch.tensor(batch["rewards"], dtype=torch.float32)  # (T,)
+        dones = torch.zeros(len(rewards))  # épisodes tronqués (OK)
 
         T, N, _ = states.shape
 
-        #### returns = self.compute_returns(rewards)
-
-        # GNN encoding par pas de temps
+        # ==================================================
+        # GNN ENCODING (T, N, emb_dim)
+        # ==================================================
         embeddings = []
         for t in range(T):
-            h_t = self.gnn(states[t], batch["adj"]) #(N, emb_dim)
+            h_t = self.gnn(states[t], batch["adj"])
             embeddings.append(h_t)
-        
-        embeddings = torch.stack(embeddings) # (T, N, emb_dim)
 
-        # Critic
-        """values = torch.stack([
-            self.critic(embeddings[t]) for t in range(T)
-        ]).squeeze()
+        embeddings = torch.stack(embeddings).detach()
 
-        advantages = returns - values.detach()"""
-
-        # =====================
-        # CRITIC VALUES
-        # =====================
+        # ==================================================
+        # CRITIC VALUES (centralized)
+        # ==================================================
         values = torch.stack([
             self.critic(embeddings[t]) for t in range(T)
         ]).squeeze()
 
-        # =====================
+        # Bootstrap V(T+1) = 0 (fin épisode)
+        values = torch.cat([values, torch.zeros(1)])
+
+        # ==================================================
         # GAE
-        # =====================
-        advantages = self.compute_gae(
+        # ==================================================
+        advantages, returns = self.compute_gae(
             rewards,
-            values.detach().tolist(),
-            gamma=self.gamma,
-            lam=0.95
+            values.detach(),
+            dones
         )
 
-        returns = advantages + values.detach()
-
-        # Normalisation des advantages (très important)
+        # Normalisation des advantages (TRÈS IMPORTANT)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
+        # ==================================================
+        # PPO UPDATE (MULTI-EPOCH RÉEL)
+        # ==================================================
+        for _ in range(self.ppo_epochs):
+            # Actor
+            dist = self.actor(embeddings.view(-1, embeddings.shape[-1]))
+            new_log_probs = dist.log_prob(actions.view(-1)).view(T, N)
 
+            ratio = torch.exp(new_log_probs - old_log_probs)
 
-        # Actor loss
-        dist = self.actor(embeddings.view(-1, embeddings.shape[-1]))
-        new_log_probs = dist.log_prob(actions.view(-1)).view(T, N)
+            adv = advantages.unsqueeze(1)  # broadcast (T, N)
 
-        ratio = torch.exp(new_log_probs - old_log_probs)
+            surr1 = ratio * adv
+            surr2 = torch.clamp(ratio, 1 - self.clip, 1 + self.clip) * adv
 
-        surr1 = ratio * advantages.unsqueeze(1)
-        surr2 = torch.clamp(ratio, 1 - self.clip, 1 + self.clip) * advantages.unsqueeze(1)
-
-        for _ in range(4):
             actor_loss = -torch.min(surr1, surr2).mean()
-
             entropy = dist.entropy().mean()
-            actor_loss = actor_loss - 0.01 * entropy
 
+            # Critic
+            value_preds = torch.stack([
+                self.critic(embeddings[t]) for t in range(T)
+            ]).squeeze()
 
-        # Critic loss
-        critic_loss = F.mse_loss(values, returns)
+            critic_loss = F.mse_loss(value_preds, returns)
 
-        loss = actor_loss + 0.5 * critic_loss
+            loss = (
+                actor_loss
+                + self.value_coef * critic_loss
+                - self.entropy_coef * entropy
+            )
 
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+        # --- LOG VALUES ---
+        self.last_actor_loss = actor_loss.item()
+        self.last_critic_loss = critic_loss.item()
+        self.last_entropy = entropy.item()
+
