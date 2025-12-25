@@ -27,4 +27,5 @@ plt.legend()
 plt.grid(alpha=0.6)
 
 plt.tight_layout()
+plt.savefig("learning_curves.png", dpi=300, bbox_inches='tight')
 plt.show()

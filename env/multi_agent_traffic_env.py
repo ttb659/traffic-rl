@@ -6,9 +6,10 @@ from graph.mapping import AGENT_IDS, AGENT_TO_IDX
 
 
 class MultiAgentTrafficEnv:
-    def __init__(self, sumo_config, max_steps=1000):
+    def __init__(self, sumo_config, max_steps=1000, use_gui=False):
         self.sumo_config = sumo_config
         self.max_steps = max_steps
+        self.use_gui = use_gui
         self.current_step = 0
 
         self.agent_ids = AGENT_IDS
@@ -23,7 +24,11 @@ class MultiAgentTrafficEnv:
         if traci.isLoaded():
             traci.close()
 
-        traci.start(["sumo", "-c", self.sumo_config])
+        if self.use_gui:
+            traci.start(["sumo-gui", "-c", self.sumo_config])
+        else:
+            traci.start(["sumo", "-c", self.sumo_config])
+
         self.current_step = 0
 
         # Vérification agents

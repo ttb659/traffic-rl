@@ -37,5 +37,5 @@ plt.title("Comparison of Traffic Signal Control Methods")
 
 plt.grid(axis="y", linestyle="--", alpha=0.6)
 plt.tight_layout()
-
+plt.savefig("Comparison_of_Traffic_Signal_Control_Methods.png", dpi=300, bbox_inches='tight')
 plt.show()
