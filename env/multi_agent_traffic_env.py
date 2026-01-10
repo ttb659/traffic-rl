@@ -31,7 +31,7 @@ class MultiAgentTrafficEnv:
 
         self.current_step = 0
 
-        # Vérification agents
+        # Vérification des agents
         tls_ids = traci.trafficlight.getIDList()
         for aid in self.agent_ids:
             assert aid in tls_ids, f"Feu {aid} introuvable dans SUMO"
@@ -47,7 +47,7 @@ class MultiAgentTrafficEnv:
         """
         self.current_step += 1
 
-        # Appliquer actions
+        # Appliquer les actions
         for aid, action in actions.items():
             if action == 1:
                 self._switch_phase(aid)
@@ -72,7 +72,7 @@ class MultiAgentTrafficEnv:
         for aid in self.agent_ids:
             lanes = traci.trafficlight.getControlledLanes(aid)
 
-            # Comptage voitures arrêtées
+            # Comptage des voitures arrêtées
             halting = [traci.lane.getLastStepHaltingNumber(l) for l in lanes]
 
             # Pad / trim à 4 directions

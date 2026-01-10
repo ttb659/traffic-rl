@@ -35,7 +35,7 @@ class MAPPO:
         )
 
     # ======================================================
-    # GAE (CORRECT)
+    # GAE
     # ======================================================
     def compute_gae(self, rewards, values, dones):
         """
@@ -55,7 +55,7 @@ class MAPPO:
         return advantages, returns
 
     # ======================================================
-    # UPDATE MAPPO (CORRIGÉ)
+    # UPDATE MAPPO 
     # ======================================================
     def update(self, batch):
         states = batch["states"]       # (T, N, obs_dim)

@@ -63,7 +63,7 @@ actor.eval()
 critic.eval()
 gnn.eval()
 
-print("✅ Modèle chargé avec succès")
+print("Modèle chargé avec succès")
 
 # =====================
 # RUN DEMO

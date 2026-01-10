@@ -94,7 +94,7 @@ for episode in range(EPISODES):
         }
 
         obs, reward_dict, dones = env.step(action_dict)
-        step_queue = sum(reward_dict.values()) * -1  # waiting time positif
+        step_queue = sum(reward_dict.values()) * -1  # attendre time positif
         total_queue += step_queue
 
 
@@ -148,7 +148,7 @@ for episode in range(EPISODES):
         )
 
 mappo.save("models_save/mappo_final+Light_Gnn.pt")
-print("✅ Final model saved.")
+print("Final model saved.")
 
 
 env.close()

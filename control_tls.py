@@ -8,14 +8,14 @@ tls_ids = traci.trafficlight.getIDList()
 print("Feux détectés :", tls_ids)
 
 if len(tls_ids) == 0:
-    print("❌ Aucun feu détecté. Arrêt.")
+    print(" Aucun feu détecté. Arrêt.")
     traci.close()
     exit()
 
 tls_id = tls_ids[0]
 print("Feu contrôlé :", tls_id)
 
-# 🔎 Récupération des phases correctement
+#  Récupération des phases correctement
 programs = traci.trafficlight.getAllProgramLogics(tls_id)
 phases = programs[0].phases
 num_phases = len(phases)

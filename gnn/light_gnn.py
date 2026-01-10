@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class LightGNN(nn.Module): # Une architecture GNN légère avec deux couches pour la comparaison avec un GNN classique
+class LightGNN(nn.Module): 
     def __init__(self, in_dim, hidden_dim, out_dim):
         super().__init__()
 
@@ -52,7 +52,6 @@ class LightGNN(nn.Module):
 
         for i in range(self.num_layers):
             # Propagation linéaire (sans Linear ni ReLU)
-            # Dans un vrai LightGNN, on appliquerait ici un masque d'élagage
             h = torch.matmul(adj, h)
             all_layers.append(h)
 
